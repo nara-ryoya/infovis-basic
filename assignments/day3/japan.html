@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+        <meta charset="utf-8">
+        <title>D3 Test</title>
+        <script src="./d3.js" charset="utf-8"></script>
+        <script src="./topojson.js" charset="utf-8"></script>
+    </head>
+<body>
+<script type="text/javascript">
+
+var width = 800;
+var height = 800;
+var populationHash = {};
+var foodProductionHash = {};
+var clothingProductionHash = {};
+var furnitureProductionHash = {};
+
+
+var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+
+//for changing the data option
+var totalHash = {
+    "Population": {
+        _data: populationHash,
+        colorScale: d3.scaleLinear()
+                    .domain([500, 14000])
+                    .range([255, 0])
+    },
+    "Food production": {
+        _data: foodProductionHash,
+        colorScale: d3.scaleLinear()
+                    .domain([100, 2000])
+                    .range([255, 0])
+    },
+    "Clothing production": {
+        _data: clothingProductionHash,
+        colorScale: d3.scaleLinear()
+                    .domain([20, 1200])
+                    .range([255, 0])
+    },
+    "Furniture production": {
+        _data: furnitureProductionHash,
+        colorScale: d3.scaleLinear()
+                    .domain([20, 500])
+                    .range([255, 0])
+    },
+}
+
+var dataOptions = ["Population", "Food production", "Clothing production", "Furniture production"];
+var selectedData = "Population";
+
+d3.csv("./Japan2015Data.csv").then(
+    (data) => {
+        data.forEach((d) => {
+            populationHash[d.Prefecture] = d.Population;
+            foodProductionHash[d.Prefecture] = d.FoodProduction;
+            clothingProductionHash[d.Prefecture] = d.ClothingProduction;
+            furnitureProductionHash[d.Prefecture] = d.FurnitureProduction;
+        });
+        showMap();
+    }
+);
+
+function showMap(){
+    d3.json("./japan.topojson").then((data) => {
+        var japan = topojson.feature(data, data.objects.japan);
+
+        var projection = d3.geoMercator()
+                .center([137, 34])
+                .translate([width/2, height/2])
+                .scale(1500);
+        var path = d3.geoPath().projection(projection);
+
+        var changeColor = () => {
+            svg.selectAll("path")
+            .attr("fill", (d) => {
+                return "rgb(255,"
+                + Math.floor(totalHash[selectedData].colorScale(totalHash[selectedData]._data[d.properties.nam_ja]))
+                + ", "
+                + Math.floor(totalHash[selectedData].colorScale(totalHash[selectedData]._data[d.properties.nam_ja]))
+                + ")"
+        })
+        }
+
+        svg.selectAll("path")
+            .data(japan.features)
+            .enter()
+            .append("path")
+            .attr("d", path)
+            .attr("fill", (d) => {
+                return "rgb(255,"
+                + Math.floor(totalHash[selectedData].colorScale(totalHash[selectedData]._data[d.properties.nam_ja]))
+                + ", "
+                + Math.floor(totalHash[selectedData].colorScale(totalHash[selectedData]._data[d.properties.nam_ja]))
+                + ")"
+        })
+        .attr("stroke", "#333333")
+        .attr("stroke-width", 0.5)
+        .on("mouseover", (event, d) => {
+            d3.select(".window").select("p")
+                .html(`Prefecture: ${d.properties.nam_ja} 
+                <br> ${selectedData}:  ${totalHash[selectedData]._data[d.properties.nam_ja]}`);
+        });
+
+        var window = d3.select("body")
+            .append("div")
+            .attr("class", "window")
+            .style("font", "12px")
+            .style("top", "10px")
+            .style("left", "10px")
+            .style("position", "absolute")
+            .style("display", "block");
+
+        var dropdown = d3.select(".window")
+                    .append("select")
+                    .on("change", (event) => {
+                        var newOption = d3.select(".window").select("select").property("value");
+                        selectedData = newOption;
+
+                        changeColor();
+                    });
+
+        dropdown.selectAll("option")
+                    .data(dataOptions)
+                    .enter()
+                    .append("option")
+                    .attr("value", (d) => { return d;})
+                    .text((d) => { return d;});
+        
+        var result = d3.select(".window").append("p");
+        })
+}
+
+</script>
+</body></html>

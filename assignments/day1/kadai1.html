@@ -1,0 +1,90 @@
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>D3 test</title>
+<script type="text/javascript" src="./d3.js"></script>
+<style type="text/css"></style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+var dataset;
+
+d3.csv("data_basics.csv").then(function(data) {
+    //console.log(data);
+    dataset = data;
+    createGraphs();
+})
+
+function createGraphs()
+{
+
+    var svg = d3.select("body").append("svg")
+    .attr("width", 2000)
+    .attr("height", 800);
+
+
+    var circle = svg.selectAll("circle")
+    .data(dataset)
+    .enter()
+    .append("circle");
+
+    circle.attr("cx", function(d, i){ return (i * 80) + 50; })
+    .attr("cy", 100)
+    .attr("r", function(d){ return d.value/2; })
+    .attr("fill", "black")
+    .attr("stroke", "black");
+
+    var text = svg.selectAll("text")
+    .data(dataset).enter().append("text");
+
+    var circle_text = text.text(function(d){ return d.value;})
+    .attr("x", function(d, i){ return (i*80) + 40;})
+    .attr("y", 30);
+
+    var bar = svg.selectAll("rect")
+    .data(dataset).enter().append("rect");
+
+    bar.attr("x", function(d, i){ return i * 80 + 30;})
+    .attr("y", function(d) { return 400 - d.value * 2;})
+    .attr("height", function(d){ return d.value * 2;})
+    .attr("width", 30);
+
+    var line = d3.line().x(function(d, i){ return i * 80 + 50;})
+    .y(function(d) { return 800 - d.value / 1;});
+
+    svg.append("path")
+    .attr("d", line(dataset))
+    .attr("stroke-width", 3)
+    .attr("stroke", "black")
+    .attr("fill", "none");
+
+        var heatmap = svg.selectAll("rect")
+    .data(dataset).enter().append("rect")
+
+    heatmap.attr("x", function(d, i){ return i * 80 + 50;})
+    .attr("y", 1000)
+    .attr("height", 80)
+    .attr("width", 80);
+
+    var svg2 = d3.select("body").append("svg")
+    .attr("width", 2000)
+    .attr("height", 1000);
+
+    var heatmap = svg2.selectAll("rect").data(dataset).enter().append("rect");
+
+
+    heatmap.attr("x", function(d, i){ return i * 80 + 50;})
+    .attr("y", 500)
+    .attr("height", 80)
+    .attr("width", 80)
+    .attr("fill", function(d){
+        return d3.rgb(255 * (1 -  d.value / 100), 255 * (1 -  d.value / 100), 255)
+    });
+}
+
+</script>
+
+</body>
+</html>

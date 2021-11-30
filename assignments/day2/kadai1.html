@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+         <meta charset="utf-8">
+         <title>D3 Test</title>
+         <script type="text/javascript" src="./d3.js"></script>
+      </head>
+      <body>
+<script type="text/javascript">
+//
+// based on Hans Rosling's presentation and Mike Bostock's D3 example
+// http://www.ted.com/talks/hans_rosling_shows_the_best_stats_you_ve_ever_seen
+// http://bost.ocks.org/mike/nations/
+//
+var width = 1000;
+var height = 600;
+var offset = 40;
+var currentYear = 1800;
+var color = d3.scaleOrdinal(d3.schemeCategory10);
+
+var color_dict = {
+  "Sub-Saharan Africa": 0,
+  "South Asia": 1,
+  "Middle East & North Africa": 2,
+  "America": 3,
+  "Europe & Central Asia": 4,
+  "East Asia & Pacific": 5
+}
+
+var svg = d3.select("body").append("svg")
+            .attr("width", width + 2*offset)
+            .attr("height", height + 2*offset);
+
+svg.append("text")
+      .attr("class", "incomeLabel")
+      .attr("text-anchor", "end")
+      .attr("x", width)
+      .attr("y", height - 10)
+      .text("Income per capita [USD]");
+
+svg.append("text")
+      .attr("class", "lifeLabel")
+      .attr("text-anchor", "end")
+      .attr("y", 35)
+      .attr("transform", "rotate(-90)")
+      .text("Life expectancy (years)");
+
+
+var yearLabel = svg.append("text")
+                  .attr("class", "yearLabel")
+                  .attr("text-anchor", "end")
+                  .attr("font-size", 50)
+                  .attr("x", width)
+                  .attr("y", height-35)
+                  .text(currentYear);
+
+var incomeScale = d3.scaleLog().domain([100, 100000]).range([0, width]);
+var lifeScale = d3.scaleLinear().domain([10, 90]).range([height, 0]);
+var populationScale = d3.scaleSqrt().domain([0, 1e9]).range([1, 50]);
+
+var incomeAxis = d3.axisBottom(incomeScale).ticks(5, d3.format(",d"));
+var lifeAxis = d3.axisLeft(lifeScale);
+
+
+svg.append("g")
+        .attr("class", "incomeAxis")
+        .attr("fill", "none")
+        .attr("stroke", "black")
+        .attr("transform",  "translate(20,"+ (height+10) +")")
+        .call(incomeAxis);
+
+svg.append("g")
+        .attr("class", "lifeAxis")
+        .attr("fill", "none")
+        .attr("stroke", "black")
+        .attr("transform", "translate(20, 10)")
+        .call(lifeAxis);
+  
+  svg.selectAll("g").selectAll("text")
+  .attr("fill", "black")
+  .attr("stroke", "none");
+
+
+
+
+d3.json("nations.json").then(function(nations) {
+
+  var bisect = d3.bisector(function(d){ return d[0];});
+
+  var circle = svg.selectAll("circle")
+      .data(interpolateData())
+      .enter()
+      .append("circle")
+      .attr("class", "circle")
+      .attr("fill", function(d) {return color(color_dict[d.region]); })
+      .attr("stroke", "black")
+      .call(position)
+      .sort(order);
+
+  svg.call(
+    d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended)
+  );
+
+  var drag_delta;
+  var drag_threshhold = 2;
+
+  function dragstarted(){
+    drag_delta = 0;
+  }
+
+  function dragged(event){
+    drag_delta += event.dx;
+    year_delta = Math.floor(drag_delta / drag_threshhold);
+
+    if (year_delta != 0)
+    {
+      nextYear = currentYear + year_delta;
+      if (nextYear < 1800) nextYeaar = 1800;
+      else if (nextYear > 2009) nextYear = 2009;
+    }
+
+    currentYear = nextYear;
+    yearLabel.text(currentYear);
+    circle.data(interpolateData(), function(d){ return d.name;})
+      .call(position).sort(order);
+    drag_delta = 0;
+  }
+
+  function dragended(){
+
+  }
+
+  function order(a, b)
+  {
+    return b.population - a.population;
+  }
+
+
+
+
+
+
+  function position(p)
+  {
+
+    p.attr("cx", function(d){ return incomeScale(d.income); });
+    p.attr("cy", function(d){ return lifeScale(d.lifeExpectancy); });
+    p.attr("r", function(d){ return populationScale(d.population); });
+  }
+
+  function interpolateValues(values, year)
+  {
+
+    var i = bisect.left(values, year, 0, values.length -1);
+    var a = values[i];
+
+    if(i>0)
+    {
+
+      var b = values[i-1];
+      var t = (year - a[0])/(b[0] - a[0]);
+      return Math.round(a[1] *(1-t) + b[1]*t);
+    }
+
+    return a[1];
+  }
+
+  function interpolateData()
+  {
+
+    return nations.map(
+      function(d) { return {
+          name: d.name,
+          region: d.region,
+          income: interpolateValues(d.income, currentYear),
+          population: interpolateValues(d.population, currentYear),
+          lifeExpectancy: interpolateValues(d.lifeExpectancy, currentYear)};
+      }
+    );
+  }
+
+});
+
+</script>
+</body></html>
