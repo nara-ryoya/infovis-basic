@@ -1,0 +1,143 @@
+<html lang="en"><head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>D3 Test</title>
+<script type="text/javascript" src="./d3.js"></script>
+<style type="text/css">
+</style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+var width = 1000;
+var height = 800;
+var locations = [];
+var connections = [];
+var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+var svg_network = d3.select("body")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+d3.csv("./flights.csv").then(function(data){
+
+  var i = 0;
+  var locationArray = [];
+
+  data.forEach(function(d){
+
+    if(locationArray.indexOf(d.Airport) == -1)
+    {
+
+      locationArray.push(d.Airport);
+      locations.push({name: d.Airport, region: "日本", id: i});
+      i++;
+    }
+
+    if(locationArray.indexOf(d.City) == -1)
+    {
+
+      locationArray.push(d.City);
+      locations.push({name: d.City, region: d.Region, id: i});
+      i++;
+    }
+
+    connections.push({source: d.Airport, target: d.City, count: d.Flights});
+  });
+
+  ShowNetwork();
+});
+
+function ShowNetwork(){
+
+  var links;
+  var nodes;
+
+  var simulation = d3.forceSimulation()
+                .force("link", d3.forceLink().id(
+                  (d) => { return d.name;}
+                ))
+                .force("charge",  d3.forceManyBody())
+                .force("center", d3.forceCenter(width/2, height/2));
+  
+  links = svg_network
+          .selectAll("line")
+          .data(connections).enter()
+          .append("line")
+          .attr("stroke", "lightgrey")
+          .attr("stroke-width", 1);
+          
+  nodes = svg_network
+        .selectAll("circle")
+        .data(locations).enter().append("g")
+        .attr("class", "node_group")
+        .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended));
+
+  svg_network.selectAll(".node_group")
+        .append("circle")
+        .attr("stroke", "black")
+        .attr("fill", (d) => { return colorScale(d.region);})
+        .attr("class", (d) => { return `node_${d.id}`;})
+        .attr("r", 5);
+  
+  svg_network.selectAll(".node_group")
+        .append("text")
+        .attr("font-size", 9)
+        .attr("stroke", "none")
+        .attr("fill", "black")
+        .text((d) => { return d.name;});
+  
+  simulation.nodes(locations)
+        .on("tick", ticked);
+  
+  simulation.force("link")
+      .links(connections).distance((d) => {
+        return 400/Math.sqrt(d.count);
+      })
+
+  function ticked() {
+    links
+    .attr("x1", function(d) { return d.source.x; })
+    .attr("y1", function(d) { return d.source.y; })
+    .attr("x2", function(d) { return d.target.x; })
+    .attr("y2", function(d) { return d.target.y; });
+
+    nodes
+    .selectAll("circle")
+    .attr("cx", function(d) { return d.x; })
+    .attr("cy", function(d) { return d.y; });
+
+    nodes
+    .selectAll("text")
+    .attr("x", function(d) { return d.x + 10; })
+    .attr("y", function(d) { return d.y + 10; });
+  }
+  function dragstarted(event, d) {
+
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+
+  function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+}
+
+
+
+
+
+</script>
+</body></html>
