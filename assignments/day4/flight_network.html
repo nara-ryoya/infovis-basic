@@ -15,6 +15,12 @@ var locations = [];
 var connections = [];
 var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
+//clicked airport ("none" if no airport is selected)
+var selectedAirport = "none";
+
+//graph matrix
+var graph_matrix = {"none": []};
+
 var svg_network = d3.select("body")
                     .append("svg")
                     .attr("width", width)
@@ -26,6 +32,14 @@ d3.csv("./flights.csv").then(function(data){
   var locationArray = [];
 
   data.forEach(function(d){
+    
+    //record the connections
+    if (! (d.Airport in graph_matrix)){
+      graph_matrix[d.Airport] = [d.City];
+    }
+    else {
+      graph_matrix[d.Airport].push(d.City);
+    }
 
     if(locationArray.indexOf(d.Airport) == -1)
     {
@@ -60,6 +74,12 @@ function ShowNetwork(){
                 ))
                 .force("charge",  d3.forceManyBody())
                 .force("center", d3.forceCenter(width/2, height/2));
+    
+  svg_network.on("click", () => {
+    selectedAirport = "none";
+    changeLineColor();
+    changeNodeColor();
+  })
   
   links = svg_network
           .selectAll("line")
@@ -75,7 +95,8 @@ function ShowNetwork(){
         .call(d3.drag()
             .on("start", dragstarted)
             .on("drag", dragged)
-            .on("end", dragended));
+            .on("end", dragended))
+        .on("click", clickNode);
 
   svg_network.selectAll(".node_group")
         .append("circle")
@@ -89,7 +110,8 @@ function ShowNetwork(){
         .attr("font-size", 9)
         .attr("stroke", "none")
         .attr("fill", "black")
-        .text((d) => { return d.name;});
+        .text((d) => {
+          return d.name;});
   
   simulation.nodes(locations)
         .on("tick", ticked);
@@ -97,7 +119,8 @@ function ShowNetwork(){
   simulation.force("link")
       .links(connections).distance((d) => {
         return 400/Math.sqrt(d.count);
-      })
+      });
+
 
   function ticked() {
     links
@@ -132,6 +155,35 @@ function ShowNetwork(){
     if (!event.active) simulation.alphaTarget(0);
     d.fx = null;
     d.fy = null;
+  }
+
+  function clickNode(event, d) {
+    event.stopPropagation();//in order for parent(svg_network).on-click method to happen
+    if (d.name in graph_matrix){
+      selectedAirport = d.name;
+    }
+    changeNodeColor();
+    changeLineColor();
+  }
+
+  function changeNodeColor(){
+    svg_network.selectAll(".node_group")
+          .attr("opacity", (d) => {
+            if (selectedAirport == "none") return "1";
+            if (graph_matrix[selectedAirport].indexOf(d.name) === -1 && ! (d.name === selectedAirport)) {
+              //if the node is not connected to the selected airport and is not selectedAirport itself, lower the opacity.
+              return "0.3";
+            }
+            else return "1";
+          })
+  }
+
+  function changeLineColor(){
+    svg_network.selectAll("line")
+        .attr("stroke", (d) => {
+          if (d.source.name === selectedAirport) return "black";
+          else return "lightgrey";
+        })
   }
 }
 
