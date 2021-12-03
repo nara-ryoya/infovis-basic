@@ -1,0 +1,281 @@
+<html lang="en"><head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>D3 Test</title>
+    <script type="text/javascript" src="./d3.js"></script>
+    <style type="text/css">
+        .tooltip {
+          position: absolute;
+          text-align: center;
+          width: auto;
+          height: auto;
+          padding: 5px;
+          font: 12px;
+          background: white;
+          -webkit-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+          -moz-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+          box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+          visibility: hidden;
+        }
+        .bar:hover {
+          fill: Brown;
+        }
+    </style>
+    <link rel="stylesheet" 
+        href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"d></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    </head>
+    <body>
+    
+    <button class="m-1 btn", style="top: 0px; position: absolute;"><a href="https://www.jal.co.jp/dom/special/sakitoku/index.html?utm_source=google&utm_medium=search&utm_campaign=01_dom&utm_term=b_%E9%A3%9B%E8%A1%8C%E6%A9%9F%20%E4%BA%88%E7%B4%84%20%E3%82%B5%E3%82%A4%E3%83%88&utm_content=02__9488191310_352975099_25345279579_484171627564_kwd-298394970395&gclid=Cj0KCQiA-qGNBhD3ARIsAO_o7yk1S6vW_OTk6uinwg01uNKE3Cw4DSK9KMSchua-rrUx6JelFI6godIaAmmSEALw_wcB">
+      予約サイトに移動
+    </a></button>
+    <script type="text/javascript">
+    
+    var width = 1000;
+    var height = 800;
+    var locations = [];
+    var connections = [];
+    var countries = [];
+    var airports = [];
+    var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    
+    //clicked airport ("none" if no airport is selected)
+    var selectedAirport = "none";
+    
+    //graph matrix
+    var graph_matrix = {"none": []};
+    
+    var svg_network = d3.select("body")
+                        .append("svg")
+                        .attr("width", width)
+                        .attr("height", height)
+                        .attr("class", "bg-light");
+    var tooltip = d3.select("body").append("div").attr("class", "tooltip");
+
+    d3.select("body").append("div").attr("class", "form-group")
+    .style("top", "0px").style("position", "absolute").style("left", "200px")
+    .text("空港を選んでください");
+
+    
+    d3.csv("./flights.csv").then(function(data){
+
+      var i = 0;
+      var locationArray = [];
+    
+      data.forEach(function(d){
+        
+        //record the connections
+        if (! (d.Airport in graph_matrix)){
+          graph_matrix[d.Airport] = [d.City];
+          airports.push(d.Airport);
+        }
+        else {
+          graph_matrix[d.Airport].push(d.City);
+        }
+    
+        if(locationArray.indexOf(d.Airport) == -1)
+        {
+    
+          locationArray.push(d.Airport);
+          locations.push({name: d.Airport, region: "日本", id: i});
+          i++;
+        }
+    
+        if(locationArray.indexOf(d.City) == -1)
+        {
+    
+          locationArray.push(d.City);
+          locations.push({name: d.City, region: d.Region, id: i});
+          i++;
+        }
+        if (!(d.City in countries)){
+          countries[d.City] = d.Country;
+        }
+    
+        connections.push({source: d.Airport, target: d.City, count: d.Flights});
+      });
+      ShowNetwork();
+      console.log(airports);
+      d3.select(".form-control").selectAll("option").data(airports)
+      .enter().append("option").attr("value", (d) => { return d;}).text((d) => { return d;});
+    });
+    
+    function ShowNetwork(){
+      var links;
+      var nodes;
+
+      var zoom = d3.zoom();
+
+      d3.select(".form-group").append("select").attr("class", "form-control")
+      .on("change", (event) => {
+        selectedAirport = d3.select(".form-group").select("select").property("value");
+        console.log(selectedAirport);
+        changeNodeColor();
+        changeLineColor();
+        console.log("yes");
+      });
+    
+      var simulation = d3.forceSimulation()
+                    .force("link", d3.forceLink().id(
+                      (d) => { return d.name;}
+                    ))
+                    .force("charge",  d3.forceManyBody())
+                    .force("center", d3.forceCenter(width/2, height/2));
+        
+      svg_network.on("click", () => {
+        selectedAirport = "none";
+        changeLineColor();
+        changeNodeColor();
+      })
+
+      links = svg_network
+              .selectAll("line")
+              .data(connections).enter()
+              .append("line")
+              .attr("stroke", "lightgrey")
+              .attr("stroke-width", 1);
+              
+      nodes = svg_network
+            .selectAll("circle")
+            .data(locations).enter().append("g")
+            .attr("class", "node_group")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
+            .on("click", clickNode)
+            .on("mouseover", function(event, d){
+              d3.select(this)
+              .attr("stroke", "yellow");
+              //ホバー時にtextを表示させる
+        
+              tooltip
+              .style("visibility", "visible");
+              
+              if (d.name in graph_matrix) tooltip.html(`${d.name}<br>日本の空港`)
+              else tooltip.html(`${d.name}<br>${countries[d.name]}`);
+            })
+            .on("mousemove", function(d) {
+              tooltip
+                .style("top", (event.pageY - 20) + "px")
+                .style("left", (event.pageX + 10) + "px");
+            })
+            .on("mouseout", function(d){
+              d3.select(this)
+              .attr("stroke", "black");
+              d3.select(".tooltip")
+              .style("visibility", "hidden");
+            });
+
+    
+      svg_network.selectAll(".node_group")
+            .append("circle")
+            .attr("stroke", "black")
+            .attr("fill", (d) => { return colorScale(d.region);})
+            .attr("class", (d) => { return `node_${d.id}`;})
+            .attr("r", (d) => {
+                if (d.name in graph_matrix){//if the node is the airport
+                    var num = graph_matrix[d.name].length;
+
+                    return 10 + num / 2;
+                }
+                else return 5;
+            });
+      
+      svg_network.call(zoom);
+
+      svg_network.selectAll(".node_group")
+            .append("text")
+            .attr("font-size", 9)
+            .attr("stroke", "none")
+            .attr("fill", "black")
+            .text((d) => {
+              return d.name;});
+      
+      simulation.nodes(locations)
+            .on("tick", ticked);
+      
+      simulation.force("link")
+          .links(connections).distance((d) => {
+            return 400/Math.sqrt(d.count);
+          });
+    
+    
+      function ticked() {
+        links
+        .attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+    
+        nodes
+        .selectAll("circle")
+        .attr("cx", function(d) { return d.x; })
+        .attr("cy", function(d) { return d.y; });
+    
+        nodes
+        .selectAll("text")
+        .attr("x", function(d) { return d.x + 10; })
+        .attr("y", function(d) { return d.y + 10; });
+      }
+      function dragstarted(event, d) {
+    
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      }
+    
+      function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+      }
+    
+      function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      }
+      
+      function clickNode(event, d) {
+        event.stopPropagation();//in order for parent(svg_network).on-click method to happen
+        if (d.name in graph_matrix){
+          selectedAirport = d.name;
+        }
+        changeNodeColor();
+        changeLineColor();
+      }
+
+      function hoverNode(event, d){
+        d3.select(this)
+      }
+    
+      function changeNodeColor(){
+        svg_network.selectAll(".node_group")
+              .attr("opacity", (d) => {
+                if (selectedAirport == "none") return "1";
+                if (graph_matrix[selectedAirport].indexOf(d.name) === -1 && ! (d.name === selectedAirport)) {
+                  //if the node is not connected to the selected airport and is not selectedAirport itself, lower the opacity.
+                  return "0.3";
+                }
+                else return "1";
+              })
+      }
+    
+      function changeLineColor(){
+        svg_network.selectAll("line")
+            .attr("stroke", (d) => {
+              if (d.source.name === selectedAirport) return "black";
+              else return "lightgrey";
+            })
+      }
+    }
+    
+    
+    
+    
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+    </body></html>
+    
